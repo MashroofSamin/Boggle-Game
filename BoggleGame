@@ -1,0 +1,201 @@
+package gui;
+
+import java.awt.*;
+import javax.swing.*;
+import javax.swing.border.LineBorder;
+import java.util.*;
+import java.io.*;
+
+public class BoggleGame {
+	
+	private JFrame frame;
+	private JButton[][] buttons = new JButton[4][4];
+	private ArrayList<String> dictionary;
+	private ArrayList<String> foundWords = new ArrayList<>();
+	private File outputFile = new File("savedWords.txt");
+	private Random random = new Random();
+	
+	private JLabel wordLabel;
+	private JButton resetButton;
+	private StringBuilder currentWord = new StringBuilder();
+	
+	private int lastRow = -1;
+	private int lastCol = -1;
+	
+	private char[] vowels = {'A', 'E', 'I', 'O', 'U'};
+	private char[] constonants = {
+			'B','C','D','F','G','H','J','K','L','M','N','P','Q','R','S','T','V','W','X','Y','Z'
+	};
+	
+	private final Color ENABLED_COLOR = new Color(173, 216, 230);
+	private final Color DISABLED_COLOR = Color.LIGHT_GRAY;
+
+	/**
+	 * Launch the application.
+	 */
+	public static void main(String[] args) {
+		EventQueue.invokeLater(() -> {
+				try {
+					BoggleGame window = new BoggleGame();
+				} catch (Exception e) {
+					e.printStackTrace();
+			}
+		});
+	}
+
+	/**
+	 * Create the application.
+	 */
+	public BoggleGame() {
+	    dictionary = loadDictionary();
+	    initialize();
+	    randomizeButtons();
+	    
+	    try (FileWriter writer = new FileWriter(outputFile, false)) {
+	    } catch (IOException e) {
+	        e.printStackTrace();
+	    }
+	    
+	    frame.setSize(500, 550);
+	    frame.setLocationRelativeTo(null);
+	    frame.setVisible(true);
+	    frame.toFront();
+	    frame.setAlwaysOnTop(true);
+	}
+	
+	private void initialize() {
+	    frame = new JFrame();
+	    frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+	    frame.setLayout(new BorderLayout(5, 5));
+	    
+	    Color buttonColor = new Color(173, 216, 230);
+	    Color borderColor = new Color(0, 51, 102);
+	    
+	    JPanel gridPanel = new JPanel(new GridLayout(4, 4, 2, 2));
+	    for(int row = 0; row < 4; row++) {
+	        for(int col = 0; col < 4; col++) {
+	            buttons[row][col] = new JButton();
+	            buttons[row][col].setPreferredSize(new Dimension(80, 80)); 
+	            buttons[row][col].setBackground(buttonColor);
+	            buttons[row][col].setOpaque(true);
+	            buttons[row][col].setBorder(new LineBorder(borderColor, 2));
+	            gridPanel.add(buttons[row][col]);
+	            
+	            int r = row; int c = col;
+	            buttons[row][col].addActionListener(e -> handleLetterClick(r, c));
+	        }
+	    }
+	    frame.add(gridPanel, BorderLayout.CENTER);
+	
+		
+		JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
+		resetButton = new JButton("Reset");
+		resetButton.addActionListener(e -> resetButtons());
+		
+		wordLabel = new JLabel("");
+
+		bottomPanel.add(resetButton);
+		bottomPanel.add(wordLabel);
+		
+		frame.add(bottomPanel, BorderLayout.SOUTH);
+	}
+	
+	private void handleLetterClick(int row, int col) {
+        if (!buttons[row][col].isEnabled()) return;
+
+        if (lastRow != -1 &&
+            (Math.abs(row - lastRow) > 1 || Math.abs(col - lastCol) > 1)) {
+            return;
+        }
+
+        buttons[row][col].setEnabled(false);
+        buttons[row][col].setBackground(DISABLED_COLOR);
+
+        currentWord.append(buttons[row][col].getText());
+        wordLabel.setText(currentWord.toString());
+
+        lastRow = row;
+        lastCol = col;
+
+        String wordSoFar = currentWord.toString();
+
+        if (isValidWord(wordSoFar) && !listContains(foundWords, wordSoFar)) {
+
+            foundWords.add(wordSoFar);
+
+            try (FileWriter writer = new FileWriter(outputFile, true)) {
+                writer.write(wordSoFar + "\n");
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            enableAllButtons();
+            currentWord.setLength(0); 
+            lastRow = -1;
+            lastCol = -1;
+        }
+    }
+	
+	
+	private void enableAllButtons() {
+		for (int row = 0; row < 4; row++) {
+			for (int col = 0; col < 4; col++) {
+				buttons[row][col].setEnabled(true);
+				buttons[row][col].setBackground(ENABLED_COLOR);
+			}
+		}
+	}
+		
+	private void resetButtons() {
+		enableAllButtons();
+		currentWord.setLength(0);
+		wordLabel.setText("");
+		lastRow = -1;
+		lastCol = -1;
+	}
+	
+	//Assign buttons random
+	private void randomizeButtons() {
+		for(int row = 0; row < 4; row++) {
+			for(int col = 0; col < 4; col++) {
+				boolean isVowel = random.nextBoolean();
+				char letter = isVowel ? vowels[random.nextInt(vowels.length)]
+									  : constonants[random.nextInt(constonants.length)];			
+				buttons[row][col].setText(Character.toString(letter));
+				}
+			}
+		}
+	
+	private ArrayList<String> loadDictionary() {
+		ArrayList<String> dictionary = new ArrayList<>();
+		InputStream input = getClass().getClassLoader().getResourceAsStream("words.txt");
+		if (input == null) {
+			System.out.println("words.txt not found");
+			return dictionary;
+		}
+		Scanner scanner = new Scanner(input);
+		while (scanner.hasNextLine()) {
+			String word = scanner.nextLine().trim().toUpperCase();
+			if (word.length() >= 3 && !listContains(dictionary, word)) {
+				dictionary.add(word);
+			}
+		}
+		scanner.close();
+		return dictionary;
+	}
+
+
+	private boolean isValidWord(String word) {
+		if (word == null || word.length() < 3) return false;
+		return listContains(dictionary, word.toUpperCase());
+	}
+	
+	private boolean listContains(ArrayList<String> list, String target) {
+		for(String s : list) {
+			if (s.equals(target)) {
+				return true;
+			}
+		}
+		return false;
+	}
+}
